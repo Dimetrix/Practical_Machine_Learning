@@ -1,0 +1,78 @@
+---
+title: "Prediction on training quality"
+author: "Dmitry Maskaev"
+date: "Sunday, September 27, 2015"
+output: html_document
+---
+
+##Overview
+In this analysis we are going to explore data from Weight Lifting Exercise Dataset, build a prediction model and see the resuilts of its prediction. 
+
+##Downloading dataset
+First we download dataset to current folder.
+```{r, eval=FALSE}
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",destfile = "train.csv",mode = "wb")
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",destfile = "test.csv",mode = "wb")
+```
+
+##Reading data
+Then we specify seed for reproducibility, load needed libraries and finally read data to dataframes.
+```{r,cache=TRUE}
+set.seed(1234)
+library(randomForest)
+library(caret)
+
+train <- read.table(file = "train.csv",sep = ",",header = T,na.strings = c("NA","#DIV/0!"),check.names = T)
+test <- read.table(file = "test.csv",sep = ",",header = T,na.strings = c("NA","#DIV/0!"),check.names = T)
+```
+
+##Data exploration
+We make initial data exploration.
+```{r}
+head(train)
+str(train)
+```
+
+##Data transformation
+We remove first 5 columns as they won't be useful for prediction. As well we remove columns with NAs.
+```{r,cache=TRUE}
+train$X <- NULL
+train$user_name <- NULL
+train$raw_timestamp_part_1 <- NULL
+train$raw_timestamp_part_2 <- NULL
+train$cvtd_timestamp <- NULL
+train <- train[,colnames(train)[!(colSums(is.na(train)) > 0)]]
+```
+
+Then we remove predictors with near-zero variance. 
+```{r,cache=TRUE}
+nzv <- nearZeroVar(train)
+filteredtrain <- train[, -nzv]
+```
+
+And split training data to train and validation datasets.
+```{r,cache=TRUE}
+ind <- createDataPartition(y = filteredtrain$classe, list = F, p = 0.7)
+train <- filteredtrain[ind,]
+valid <- filteredtrain[-ind,]
+```
+
+##Building a model
+After that we build a model. We'll use random forests for that with default options and Principal Component Analysis (PCA) pre-processing.
+```{r,cache=TRUE,message=FALSE}
+fit <- train(classe ~ ., data = train, method = "rf", preProcess = "pca")
+```
+
+##Prediction
+Finally let's try make predictions with our model and see predictions results on the training set...
+```{r}
+pred <- predict(object = fit,newdata = train)
+table(pred,train$classe)
+```
+
+...and on the validation set.
+```{r}
+pred2 <- predict(object = fit,newdata = valid)
+table(pred2,valid$classe)
+```
+As we see the prediction with random forests is quite exact. But we are waiting a bit worse result on test data.
